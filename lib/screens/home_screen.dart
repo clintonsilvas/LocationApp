@@ -1,0 +1,164 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import 'package:locationapp/models/entrega.dart';
+import 'package:locationapp/repository/entrega_repository.dart';
+import 'package:locationapp/widgets/entrega/entrega_card.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final repository = EntregaRepository();
+  List<Entrega> entregas = [];
+
+  bool carregando = true;
+
+  @override
+  void initState() {
+    super.initState();
+
+    carregarEntregas();
+  }
+
+  Future<void> carregarEntregas() async {
+    setState(() {
+      carregando = true;
+    });
+
+    entregas = await repository.listarEntregas();
+
+    setState(() {
+      carregando = false;
+    });
+  }
+
+  Future<void> abrirFormulario({Entrega? entrega}) async {
+    await context.pushNamed('entrega-form', extra: entrega);
+
+    carregarEntregas();
+  }
+
+  Future<void> excluirEntrega(Entrega entrega) async {
+    await repository.deletarEntrega(entrega.idEntrega);
+
+    carregarEntregas();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Entregas'), centerTitle: true),
+
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: 'add',
+            onPressed: () => abrirFormulario(),
+            child: const Icon(Icons.add),
+          ),
+        ],
+      ),
+
+      body: carregando
+          ? const Center(child: CircularProgressIndicator())
+          : entregas.isEmpty
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+
+                children: [
+                  Icon(
+                    Icons.local_shipping_outlined,
+                    size: 80,
+                    color: Colors.grey,
+                  ),
+
+                  SizedBox(height: 20),
+
+                  Text(
+                    'Nenhuma entrega cadastrada',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: carregarEntregas,
+
+              child: ListView.builder(
+                padding: const EdgeInsets.only(top: 10, bottom: 100),
+
+                itemCount: entregas.length,
+
+                itemBuilder: (context, index) {
+                  final entrega = entregas[index];
+
+                  return EntregaCard(
+                    entrega: entrega,
+
+                    onEditar: () {
+                      abrirFormulario(entrega: entrega);
+                    },
+
+                    onExcluir: () async {
+                      final confirmar = await showDialog<bool>(
+                        context: context,
+
+                        builder: (context) {
+                          return AlertDialog(
+                            title: const Text('Excluir entrega'),
+
+                            content: const Text(
+                              'Deseja realmente excluir esta entrega?',
+                            ),
+
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context, false);
+                                },
+
+                                child: const Text('Cancelar'),
+                              ),
+
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context, true);
+                                },
+
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+
+                                child: const Text('Excluir'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+
+                      if (confirmar == true) {
+                        excluirEntrega(entrega);
+                      }
+                    },
+
+                    onVerCompleto: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Tela de mapa em desenvolvimento'),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+    );
+  }
+}
