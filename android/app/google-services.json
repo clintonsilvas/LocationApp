@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "755928162485",
+    "project_id": "projeto-entregas-clinton",
+    "storage_bucket": "projeto-entregas-clinton.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:755928162485:android:cb3367354bb013caab9efc",
+        "android_client_info": {
+          "package_name": "com.example.locationapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpvwxEEsJxfMPtO0iEw577L5e0jutrZfA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -165,18 +165,6 @@ class EntregaCard extends StatelessWidget {
                     label: const Text('Editar'),
                   ),
                 ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: onVerCompleto,
-
-                    icon: const Icon(Icons.map),
-
-                    label: const Text('Mapa'),
-                  ),
-                ),
               ],
             ),
 

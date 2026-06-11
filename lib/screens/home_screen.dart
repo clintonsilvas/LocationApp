@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:locationapp/db/local/sqlite_entrega_datasource.dart';
+import 'package:locationapp/db/remote/firebase_entrega_datasource.dart';
 
 import 'package:locationapp/models/entrega.dart';
 import 'package:locationapp/repository/entrega_repository.dart';
+import 'package:locationapp/services/connectivity_service.dart';
+import 'package:locationapp/services/sync_service.dart';
 import 'package:locationapp/widgets/entrega/entrega_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -13,14 +17,32 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final repository = EntregaRepository();
-  List<Entrega> entregas = [];
+  final local = SqliteEntregaDataSource();
+  final remote = FirebaseEntregaDataSource();
+  final connectivity = ConnectivityService();
+  late final EntregaRepository repository;
+  late final SyncService syncService;
+  int entregasPendentes = 0;
 
+  List<Entrega> entregas = [];
   bool carregando = true;
 
+  int get pendentesSync => entregas.where((e) => !e.sincronizado).length;
   @override
   void initState() {
     super.initState();
+
+    repository = EntregaRepository(
+      local: local,
+      remote: remote,
+      connectivity: connectivity,
+    );
+
+    syncService = SyncService(
+      local: local,
+      remote: remote,
+      connectivity: connectivity,
+    );
 
     carregarEntregas();
   }
@@ -29,6 +51,9 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       carregando = true;
     });
+
+    await syncService.sincronizar();
+    entregasPendentes = await local.contarPendentesSincronizacao();
 
     entregas = await repository.listarEntregas();
 
@@ -88,76 +113,70 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             )
-          : RefreshIndicator(
-              onRefresh: carregarEntregas,
+          : Column(
+              children: [
+                if (entregasPendentes > 0)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.cloud_off, color: Colors.orange),
 
-              child: ListView.builder(
-                padding: const EdgeInsets.only(top: 10, bottom: 100),
+                        const SizedBox(width: 10),
 
-                itemCount: entregas.length,
-
-                itemBuilder: (context, index) {
-                  final entrega = entregas[index];
-
-                  return EntregaCard(
-                    entrega: entrega,
-
-                    onEditar: () {
-                      abrirFormulario(entrega: entrega);
-                    },
-
-                    onExcluir: () async {
-                      final confirmar = await showDialog<bool>(
-                        context: context,
-
-                        builder: (context) {
-                          return AlertDialog(
-                            title: const Text('Excluir entrega'),
-
-                            content: const Text(
-                              'Deseja realmente excluir esta entrega?',
-                            ),
-
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context, false);
-                                },
-
-                                child: const Text('Cancelar'),
-                              ),
-
-                              ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pop(context, true);
-                                },
-
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                ),
-
-                                child: const Text('Excluir'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-
-                      if (confirmar == true) {
-                        excluirEntrega(entrega);
-                      }
-                    },
-
-                    onVerCompleto: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Tela de mapa em desenvolvimento'),
+                        Expanded(
+                          child: Text(
+                            '$entregasPendentes entrega(s) não sincronizada(s), aguardando conexão com a internet.',
+                          ),
                         ),
-                      );
-                    },
-                  );
-                },
-              ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: carregarEntregas,
+
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(top: 10, bottom: 100),
+
+                      itemCount: entregas.length,
+
+                      itemBuilder: (context, index) {
+                        final entrega = entregas[index];
+
+                        return EntregaCard(
+                          entrega: entrega,
+
+                          onEditar: () {
+                            abrirFormulario(entrega: entrega);
+                          },
+
+                          onExcluir: () async {
+                            // seu código atual
+                          },
+
+                          onVerCompleto: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Tela de mapa em desenvolvimento',
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }

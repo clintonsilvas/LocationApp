@@ -1,68 +1,75 @@
+import 'package:locationapp/db/local/sqlite_entrega_datasource.dart';
+import 'package:locationapp/db/remote/firebase_entrega_datasource.dart';
 import 'package:locationapp/models/entrega.dart';
-import 'package:locationapp/db/db.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:locationapp/services/connectivity_service.dart';
 import 'package:uuid/uuid.dart';
 
 class EntregaRepository {
-  final uuid = Uuid();
-  Future<Database> get _db async => await DB.instance.database;
+  final SqliteEntregaDataSource local;
+  final FirebaseEntregaDataSource remote;
+  final ConnectivityService connectivity;
 
-  Future<void> inserirEntrega(Entrega e) async {
-    final db = await _db;
-    String idEntrega = uuid.v4();
+  final Uuid uuid = const Uuid();
 
-    await db.insert('entrega', {
-      'idEntrega': idEntrega,
-      'destinatario': e.destinatario,
-      'endereco': e.endereco,
-      'status': e.status.name,
-      'latitude': e.latitude,
-      'longitude': e.longitude,
-      'datahora': e.dataHora.toIso8601String(),
-    });
+  EntregaRepository({
+    required this.local,
+    required this.remote,
+    required this.connectivity,
+  });
+
+  Future<void> inserirEntrega(Entrega entrega) async {
+    final online = await connectivity.temInternet();
+    final novaEntrega = Entrega(
+      idEntrega: uuid.v4(),
+      destinatario: entrega.destinatario,
+      endereco: entrega.endereco,
+      status: entrega.status,
+      latitude: entrega.latitude,
+      longitude: entrega.longitude,
+      dataHora: entrega.dataHora,
+      sincronizado: online,
+    );
+
+    await local.inserirEntrega(novaEntrega);
+
+    if (await connectivity.temInternet()) {
+      try {
+        await remote.inserirEntrega(novaEntrega);
+      } catch (_) {}
+    }
   }
 
   Future<void> atualizarEntrega(Entrega entrega) async {
-    final db = await _db;
+    await local.atualizarEntrega(entrega);
 
-    await db.update(
-      'entrega',
-      {
-        'destinatario': entrega.destinatario,
-        'endereco': entrega.endereco,
-        'status': entrega.status.name,
-        'latitude': entrega.latitude,
-        'longitude': entrega.longitude,
-        'datahora': entrega.dataHora.toIso8601String(),
-      },
-      where: 'idEntrega = ?',
-      whereArgs: [entrega.idEntrega],
-    );
+    if (await connectivity.temInternet()) {
+      try {
+        await remote.atualizarEntrega(entrega);
+      } catch (_) {}
+    }
   }
 
-  Future<void> deletarEntrega(String idEntrega) async {
-    final db = await _db;
-    await db.delete('entrega', where: 'idEntrega = ?', whereArgs: [idEntrega]);
+  Future<void> deletarEntrega(String id) async {
+    await local.deletarEntrega(id);
+
+    if (await connectivity.temInternet()) {
+      try {
+        await remote.deletarEntrega(id);
+      } catch (_) {}
+    }
   }
 
   Future<List<Entrega>> listarEntregas() async {
-    final db = await _db;
+    if (await connectivity.temInternet()) {
+      try {
+        final entregasFirebase = await remote.listarEntregas();
 
-    final resultado = await db.query('entrega');
+        return entregasFirebase;
+      } catch (_) {
+        return await local.listarEntregas();
+      }
+    }
 
-    return resultado.map((e) {
-      return Entrega(
-        idEntrega: e['idEntrega'] as String,
-        destinatario: e['destinatario'] as String,
-        endereco: e['endereco'] as String,
-
-        status: StatusPedido.values.firstWhere((s) => s.name == e['status']),
-
-        latitude: e['latitude'] as double,
-        longitude: e['longitude'] as double,
-
-        dataHora: DateTime.parse(e['datahora'] as String),
-      );
-    }).toList();
+    return await local.listarEntregas();
   }
 }

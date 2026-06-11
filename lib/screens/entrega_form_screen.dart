@@ -3,6 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:locationapp/db/local/sqlite_entrega_datasource.dart';
+import 'package:locationapp/db/remote/firebase_entrega_datasource.dart';
+import 'package:locationapp/services/connectivity_service.dart';
 
 import '../models/entrega.dart';
 import '../repository/entrega_repository.dart';
@@ -17,16 +20,22 @@ class EntregaFormScreen extends StatefulWidget {
 }
 
 class _EntregaFormScreenState extends State<EntregaFormScreen> {
-  final repository = EntregaRepository();
+  final local = SqliteEntregaDataSource();
+  final remote = FirebaseEntregaDataSource();
+  final connectivity = ConnectivityService();
+  late final EntregaRepository repository;
+
+  double? latitudeAtual;
+  double? longitudeAtual;
+
+  double? latitudeAnterior;
+  double? longitudeAnterior;
 
   final destinatarioController = TextEditingController();
 
   final enderecoController = TextEditingController();
 
   StatusPedido statusSelecionado = StatusPedido.pendente;
-
-  double? latitude;
-  double? longitude;
 
   bool carregandoLocalizacao = true;
 
@@ -35,19 +44,22 @@ class _EntregaFormScreenState extends State<EntregaFormScreen> {
   @override
   void initState() {
     super.initState();
+    repository = EntregaRepository(
+      local: local,
+      remote: remote,
+      connectivity: connectivity,
+    );
 
     if (editando) {
       destinatarioController.text = widget.entrega!.destinatario;
-
       enderecoController.text = widget.entrega!.endereco;
 
-      latitude = widget.entrega!.latitude;
-
-      longitude = widget.entrega!.longitude;
+      latitudeAnterior = widget.entrega!.latitude;
+      longitudeAnterior = widget.entrega!.longitude;
 
       statusSelecionado = widget.entrega!.status;
 
-      carregandoLocalizacao = false;
+      pegarLocalizacao();
     } else {
       pegarLocalizacao();
     }
@@ -84,16 +96,15 @@ class _EntregaFormScreenState extends State<EntregaFormScreen> {
     Position position = await Geolocator.getCurrentPosition();
 
     setState(() {
-      latitude = position.latitude;
-
-      longitude = position.longitude;
+      latitudeAtual = position.latitude;
+      longitudeAtual = position.longitude;
 
       carregandoLocalizacao = false;
     });
   }
 
   Future<void> salvar() async {
-    if (latitude == null || longitude == null) {
+    if (latitudeAtual == null || longitudeAtual == null) {
       return;
     }
 
@@ -108,11 +119,11 @@ class _EntregaFormScreenState extends State<EntregaFormScreen> {
 
           status: statusSelecionado,
 
-          latitude: latitude!,
-
-          longitude: longitude!,
+          latitude: latitudeAtual!,
+          longitude: longitudeAtual!,
 
           dataHora: DateTime.now(),
+          sincronizado: widget.entrega!.sincronizado,
         ),
       );
     } else {
@@ -126,11 +137,11 @@ class _EntregaFormScreenState extends State<EntregaFormScreen> {
 
           status: StatusPedido.pendente,
 
-          latitude: latitude!,
-
-          longitude: longitude!,
+          latitude: latitudeAtual!,
+          longitude: longitudeAtual!,
 
           dataHora: DateTime.now(),
+          sincronizado: false,
         ),
       );
     }
@@ -179,6 +190,18 @@ class _EntregaFormScreenState extends State<EntregaFormScreen> {
             ),
 
             const SizedBox(height: 10),
+            if (editando)
+              const Row(
+                children: [
+                  Icon(Icons.location_pin, color: Colors.blue),
+                  Text(' Última posição'),
+
+                  SizedBox(width: 20),
+
+                  Icon(Icons.location_pin, color: Colors.red),
+                  Text(' Localização atual'),
+                ],
+              ),
 
             Container(
               height: 300,
@@ -190,18 +213,32 @@ class _EntregaFormScreenState extends State<EntregaFormScreen> {
 
               child: carregandoLocalizacao
                   ? const Center(child: CircularProgressIndicator())
-                  : latitude == null || longitude == null
+                  : latitudeAtual == null || longitudeAtual == null
                   ? const Center(
                       child: Text('Não foi possível obter localização'),
                     )
                   : FlutterMap(
                       options: MapOptions(
-                        initialCenter: LatLng(latitude!, longitude!),
+                        initialCenter: LatLng(latitudeAtual!, longitudeAtual!),
 
-                        initialZoom: 16,
+                        initialZoom: 8,
                       ),
 
                       children: [
+                        if (editando &&
+                            latitudeAnterior != null &&
+                            longitudeAnterior != null)
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: [
+                                  LatLng(latitudeAnterior!, longitudeAnterior!),
+                                  LatLng(latitudeAtual!, longitudeAtual!),
+                                ],
+                                strokeWidth: 4,
+                              ),
+                            ],
+                          ),
                         TileLayer(
                           urlTemplate:
                               'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -211,12 +248,25 @@ class _EntregaFormScreenState extends State<EntregaFormScreen> {
 
                         MarkerLayer(
                           markers: [
-                            Marker(
-                              point: LatLng(latitude!, longitude!),
+                            if (editando)
+                              Marker(
+                                point: LatLng(
+                                  latitudeAnterior!,
+                                  longitudeAnterior!,
+                                ),
+                                width: 80,
+                                height: 80,
+                                child: const Icon(
+                                  Icons.location_pin,
+                                  color: Colors.blue,
+                                  size: 40,
+                                ),
+                              ),
 
+                            Marker(
+                              point: LatLng(latitudeAtual!, longitudeAtual!),
                               width: 80,
                               height: 80,
-
                               child: const Icon(
                                 Icons.location_pin,
                                 color: Colors.red,

@@ -25,13 +25,14 @@ class DB {
   Future _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE entrega (
-        idEntrega TEXT,
+        idEntrega TEXT PRIMARY KEY,
         destinatario TEXT,
         endereco TEXT,
         status TEXT,
         latitude REAL,
         longitude REAL,
-        datahora TEXT
+        datahora TEXT,
+        sincronizado INTEGER DEFAULT 0
       )
     ''');
   }

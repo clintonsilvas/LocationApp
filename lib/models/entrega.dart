@@ -6,6 +6,7 @@ class Entrega {
   final double latitude;
   final double longitude;
   final DateTime dataHora;
+  final bool sincronizado;
 
   Entrega({
     required this.idEntrega,
@@ -15,6 +16,7 @@ class Entrega {
     required this.latitude,
     required this.longitude,
     required this.dataHora,
+    this.sincronizado = false,
   });
 }
 
