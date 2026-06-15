@@ -159,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
 
                           onExcluir: () async {
-                            // seu código atual
+                            excluirEntrega(entrega);
                           },
 
                           onVerCompleto: () {

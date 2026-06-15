@@ -19,12 +19,20 @@ class SyncService {
     }
 
     final pendentes = await local.listarPendentesSincronizacao();
+    final excluidasLocal = await local.listarExclusoesPendentes();
 
     for (final entrega in pendentes) {
       try {
         await remote.inserirEntrega(entrega);
 
         await local.marcarComoSincronizado(entrega.idEntrega);
+      } catch (_) {}
+    }
+
+    for (final e in excluidasLocal) {
+      try {
+        await remote.deletarEntrega(e);
+        await local.removerExclusaoPendente(e);
       } catch (_) {}
     }
   }

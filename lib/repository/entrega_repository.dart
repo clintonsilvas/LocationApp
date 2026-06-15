@@ -56,6 +56,8 @@ class EntregaRepository {
       try {
         await remote.deletarEntrega(id);
       } catch (_) {}
+    } else {
+      await local.adicionarExclusaoPendente(id);
     }
   }
 

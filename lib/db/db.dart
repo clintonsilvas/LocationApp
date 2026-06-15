@@ -35,6 +35,11 @@ class DB {
         sincronizado INTEGER DEFAULT 0
       )
     ''');
+    await db.execute('''
+      CREATE TABLE exclusoes_pendentes (
+        idEntrega TEXT PRIMARY KEY
+      )
+    ''');
   }
 
   Future close() async {

@@ -78,14 +78,10 @@ class SqliteEntregaDataSource {
         idEntrega: e['idEntrega'] as String,
         destinatario: e['destinatario'] as String,
         endereco: e['endereco'] as String,
-
         status: StatusPedido.values.firstWhere((s) => s.name == e['status']),
-
         latitude: (e['latitude'] as num).toDouble(),
         longitude: (e['longitude'] as num).toDouble(),
-
         dataHora: DateTime.parse(e['datahora'] as String),
-
         sincronizado: (e['sincronizado'] as int) == 1,
       );
     }).toList();
@@ -112,5 +108,29 @@ class SqliteEntregaDataSource {
     ''');
 
     return resultado.first['total'] as int;
+  }
+
+  Future<void> adicionarExclusaoPendente(String idEntrega) async {
+    final db = await _db;
+
+    await db.insert('exclusoes_pendentes', {'idEntrega': idEntrega});
+  }
+
+  Future<List<String>> listarExclusoesPendentes() async {
+    final db = await _db;
+
+    final resultado = await db.query('exclusoes_pendentes');
+
+    return resultado.map((e) => e['idEntrega'] as String).toList();
+  }
+
+  Future<void> removerExclusaoPendente(String idEntrega) async {
+    final db = await _db;
+
+    await db.delete(
+      'exclusoes_pendentes',
+      where: 'idEntrega = ?',
+      whereArgs: [idEntrega],
+    );
   }
 }
